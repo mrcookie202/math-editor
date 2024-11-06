@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Document Editor with Math Rendering and PDF Export</title>
+    <!-- KaTeX CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.css">
+    <!-- Custom CSS -->
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+        }
+        .toolbar {
+            background-color: #f0f0f0;
+            padding: 10px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+        }
+        .toolbar button {
+            margin-right: 10px;
+            padding: 8px 12px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #ddd;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+        }
+        .toolbar button:hover {
+            background-color: #ccc;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+        .editor-container {
+            position: relative;
+            width: 45%;
+            margin: 0 10px;
+        }
+        .editor {
+            width: 100%;
+            background-color: #ffffff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            overflow-wrap: break-word;
+            min-height: 500px;
+            color: #000000;
+            outline: none;
+        }
+        .output {
+            width: 45%;
+            background-color: #ffffff;
+            padding: 20px;
+            margin: 0 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            overflow: auto;
+            color: #000000;
+        }
+        .page {
+            max-width: 816px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 20px;
+            color: #000000;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            margin-top: 24px;
+            color: #000000;
+        }
+        b, strong {
+            font-weight: bold;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <button id="runBtn">Run</button>
+        <button id="clearBtn">Clear</button>
+        <button id="pdfBtn">Export to PDF</button>
+    </div>
+
+    <!-- Container for side-by-side layout -->
+    <div class="container">
+        <!-- Editable Document Area -->
+        <div class="editor-container">
+            <div class="editor" contenteditable="true" spellcheck="false" id="editor">
+            </div>
+        </div>
+
+        <!-- Output Area -->
+        <div class="output">
+            <!-- Rendered content will appear here -->
+        </div>
+    </div>
+
+    <!-- KaTeX JS -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/contrib/auto-render.min.js"></script>
+    <!-- Marked.js -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- html2pdf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script>
+        function renderContent() {
+            let editorContent = document.getElementById('editor').innerHTML;
+
+            // Normalize the line breaks and replace <div> or <br> tags with line breaks
+            editorContent = editorContent.replace(/<div>/g, '\n')
+                                         .replace(/<\/div>/g, '')
+                                         .replace(/<br>/g, '\n');
+
+            // Add line breaks at every 37th line
+            const lines = editorContent.split('\n');
+            for (let i = 37; i < lines.length; i += 38) {
+                lines[i - 1] += '<br style="page-break-before: always;">';
+            }
+            editorContent = lines.join('\n');
+
+            // Convert markdown to HTML
+            let htmlContent = marked.parse(editorContent);
+
+            // Create a container for the output
+            const outputContainer = document.createElement('div');
+            outputContainer.classList.add('page');
+            outputContainer.innerHTML = htmlContent;
+
+            // Render LaTeX using KaTeX with custom delimiters
+            renderMathInElement(outputContainer, {
+                delimiters: [
+                    // Custom delimiters for inline math
+                    {left: '((', right: '))', display: false},
+                    {left: '(', right: ')', display: false},
+                    {left: '[', right: ']', display: false},
+                    // Standard LaTeX delimiters
+                    {left: '\\(', right: '\\)', display: false},
+                    {left: '\\[', right: '\\]', display: false},
+                    {left: '$$', right: '$$', display: false},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false,
+                errorColor: '#000'
+            });
+
+            // Display the output
+            const outputArea = document.querySelector('.output');
+            outputArea.innerHTML = '';
+            outputArea.appendChild(outputContainer);
+        }
+
+        function exportToPDF() {
+            renderContent(); // Ensure content is up-to-date
+
+            const outputContainer = document.querySelector('.output .page');
+
+            // Use html2pdf.js to generate text-based PDF
+            var opt = {
+                margin:       0.5,
+                filename:     'document.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait', html2pdf: { outputType: 'text' } }
+            };
+
+            html2pdf().set(opt).from(outputContainer).save();
+        }
+
+        document.getElementById('runBtn').addEventListener('click', function() {
+            renderContent();
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            document.getElementById('editor').innerHTML = '';
+            document.querySelector('.output').innerHTML = '';
+        });
+
+        document.getElementById('pdfBtn').addEventListener('click', function() {
+            exportToPDF();
+        });
+
+        // Add event listener for Ctrl+B to rerun the render
+        document.addEventListener('keydown', function(event) {
+            if (event.ctrlKey && event.key === 'b') {
+                event.preventDefault();
+                renderContent();
+            }
+        });
+
+        // Add event listener for Ctrl+X to export to PDF
+        document.addEventListener('keydown', function(event) {
+            if (event.ctrlKey && event.key === 'x') {
+                event.preventDefault();
+                exportToPDF();
+            }
+        });
+    </script>
+</body>
+</html>
